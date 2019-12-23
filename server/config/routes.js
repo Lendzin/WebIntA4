@@ -26,22 +26,10 @@ module.exports.routes = {
     view: 'assets/index.html'
   },
   //ITEM CONTROLLER
-  'get /wordOne/:search': {
+  'get /start': {
     controller: 'ItemsController',
-    action: 'wordOne'
+    action: 'itemFunction'
   },
-
-  'get /wordMore/:search': {
-    controller: 'ItemsController',
-    action: 'wordMore'
-  },
-
-  'get /pageRank/:search': {
-    controller: 'ItemsController',
-    action: 'pageRank'
-  },
-
-
   /***************************************************************************
   *                                                                          *
   * More custom routes here...                                               *
