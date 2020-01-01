@@ -5,20 +5,26 @@
  * @help        :: See https://sailsjs.com/docs/concepts/actions
  */
 const csv = require('csvtojson')
-const pathBanknotes = './../../banknote_authentication.csv'
-const pathIris = './../../iris.csv'
+// const pathToData = './../../banknote_authentication.csv' //banknotes data
+// const pathToData = './../../iris.csv' // large iris sample
+const pathToData = './../../irisSmall.csv' // small iris sample
+
+const labels = [
+  'sepal_length',
+  'sepal_width',
+  'petal_length',
+  'petal_width',
+  'species',
+]
+
 var distributions = require('distributions')
-// let testFlower = {
-//   // class2 flower? (virginica)
-//   SepalLength: 6.52,
-//   SepalWidth: 2.93,
-//   PetalLength: 5.52,
-//   PetalWidth: 2.02,
-// }
+let testFlower = {
+  petal_length: 1.6,
+  petal_width: 0.8,
+}
 module.exports = {
   itemFunction: async (req, res) => {
-    // let objects = await getData(pathBanknotes)
-    let objects = await getData(pathIris)
+    let objects = await getData(pathToData, labels)
     let copyObjects = JSON.parse(JSON.stringify(objects))
     let itemsToClassify = JSON.parse(JSON.stringify(objects))
     for (object in itemsToClassify) {
@@ -36,38 +42,47 @@ module.exports = {
           currentClassObject['averages'] = newObject
           createAverages(newObject, values, currentClassObject)
         }
+        // console.log(currentClassObject) // to check values
       }
     }
 
     let scores = {}
     let values = {}
     let sumValues = 0
+    itemsToClassify = [testFlower] // try one flower
     for (let item in itemsToClassify) {
       let currentItem = itemsToClassify[item]
       for (entry in currentItem) {
-        for (currentClass in valuesFromObjects) {
-          let averages = valuesFromObjects[currentClass].averages
-          let prevValue = ''
-          let index = 1
-          for (let value in averages) {
-            if (value.includes(entry)) {
-              if (index % 2) {
-                let normal = distributions.Normal(
-                  averages[value],
-                  averages[prevValue]
-                )
-                let probability = normal.pdf(currentItem[entry])
-                if (values[currentClass]) {
-                  values[currentClass] = probability * values[currentClass]
-                  sumValues += probability
+        if (!entry.includes('Values')) {
+          console.log(entry)
+          for (currentClass in valuesFromObjects) {
+            let averages = valuesFromObjects[currentClass].averages
+            let avgValue = ''
+            let index = 0
+            for (let value in averages) {
+              if (value.includes(entry)) {
+                if (index % 2 && index !== 0) {
+                  let stdValue = averages[value]
+                  console.log(currentItem[entry], stdValue, avgValue)
+                  let probability = getPdf(
+                    currentItem[entry],
+                    stdValue,
+                    avgValue
+                  )
+
+                  console.log(probability)
+                  if (values[currentClass]) {
+                    values[currentClass] = probability * values[currentClass]
+                    sumValues += probability
+                  } else {
+                    values[currentClass] = probability
+                    sumValues += probability
+                  }
+                  index++
                 } else {
-                  values[currentClass] = probability
-                  sumValues += probability
+                  avgValue = averages[value]
+                  index++
                 }
-                index++
-              } else {
-                prevValue = value
-                index++
               }
             }
           }
@@ -97,49 +112,47 @@ module.exports = {
   },
 }
 
-function createAverages(currentObject, values, currentClassObject) {
-  currentObject[values + 'Avg'] = getAverage(currentClassObject[values])
-  currentObject[values + 'StD'] = getStandardDeviation(
-    currentClassObject[values]
+function getPdf(value, std, mean) {
+  return (
+    (1 / (Math.sqrt(2 * 3.14) * std)) *
+    Math.exp(-Math.pow(value - mean, 2) / (2 * Math.pow(std, 2)))
   )
 }
 
-function getData(path) {
+function createAverages(currentObject, values, currentClassObject) {
+  let ccoValues = currentClassObject[values]
+  let avg = getAverage(ccoValues)
+  currentObject[values + 'Avg'] = avg
+  currentObject[values + 'StD'] = getStandardDeviation(ccoValues, avg)
+}
+
+function getData(path, labels) {
   return csv()
     .fromFile(__dirname + path)
     .then(sources => {
-      let newSources = sources.map(source => {
-        if (source['entropy of image']) {
-          let newSource = {}
-          newSource.Variance = Number(
-            source['variance of Wavelet Transformed image']
-          )
-          newSource.Skewness = Number(
-            source['skewness of Wavelet Transformed image']
-          )
-          newSource.Curtosis = Number(
-            source['curtosis of Wavelet Transformed image']
-          )
-          newSource.Entropy = Number(source['entropy of image'])
-          newSource.class = Number(source.class)
-          return newSource
-        } else {
-          let newSource = {}
-          newSource.SepalLength = Number(source.sepal_length)
-          newSource.SepalWidth = Number(source.sepal_width)
-          newSource.PetalLength = Number(source.petal_length)
-          newSource.PetalWidth = Number(source.petal_width)
-          if (source.species === 'Iris-setosa') {
-            newSource.class = 0
-          } else if (source.species === 'Iris-versicolor') {
-            newSource.class = 1
-          } else if (source.species === 'Iris-virginica') {
-            newSource.class = 2
-          } else newSource.class = 3
-          return newSource
+      let amountOfClasses = new Set()
+      let newSources = sources.map((source, index) => {
+        let objectKeys = Object.keys(source)
+        let objectSize = objectKeys.length
+        let lastKey = objectKeys[objectSize - 1]
+        let newSource = {}
+        for (let content in source) {
+          if (labels.includes(content)) {
+            if (content === lastKey) {
+              if (amountOfClasses.has(source[content])) {
+                let indexForKey = [...amountOfClasses].indexOf(source[content])
+                newSource.class = indexForKey + 1
+              } else {
+                amountOfClasses.add(source[content])
+                newSource.class = amountOfClasses.size
+              }
+            } else {
+              newSource[content] = Number(source[content])
+            }
+          }
         }
+        return newSource
       })
-
       return newSources
     })
 }
@@ -181,20 +194,25 @@ getValues = objects => {
   return values
 }
 
-getStandardDeviation = values => {
-  let avg = getAverage(values)
-
+round = number => {
+  return Math.round(number * 100) / 100
+}
+getStandardDeviation = (values, avg) => {
   let squareDiffs = values.map(value => {
     let diff = value - avg
-    let sqrDiff = diff * diff
+    let sqrDiff = Math.pow(diff, 2)
     return sqrDiff
   })
 
-  let avgSquareDiff = getAverage(squareDiffs)
+  let sqrDiffSum = squareDiffs.reduce((sum, num) => {
+    return sum + num
+  }, 0)
 
-  let stdDev = Math.sqrt(avgSquareDiff)
+  let someValue = sqrDiffSum / (squareDiffs.length - 1)
 
-  return stdDev
+  let stdDev = Math.sqrt(someValue)
+
+  return round(stdDev)
 }
 
 getAverage = data => {
@@ -203,5 +221,5 @@ getAverage = data => {
   }, 0)
 
   let avg = sum / data.length
-  return avg
+  return round(avg)
 }
