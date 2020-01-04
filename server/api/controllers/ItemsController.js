@@ -42,7 +42,7 @@ module.exports = {
 
     let valuesMatrixCopy = JSON.parse(JSON.stringify(valuesMatrix))
 
-    let itemsMatrix = valuesMatrixCopy.splice(0, valuesMatrixCopy.length - 1)
+    let itemsForMatrix = valuesMatrixCopy.splice(0, valuesMatrixCopy.length - 1)
 
     let labelsForMatrix = valuesMatrixCopy.splice(
       valuesMatrixCopy.length - 1,
@@ -50,21 +50,28 @@ module.exports = {
     )
     labelsForMatrix = labelsForMatrix[0]
 
-    fit(itemsMatrix, labelsForMatrix)
-
     // itemsToClassifyWithoutClassesMatrix = [[1.6], [0.8]] // remove to test more than one
-
-    let arrayOfPredictions = predict(itemsMatrix)
-
-    let accuracyScore = getAccuracyScore(arrayOfPredictions, labelsForMatrix)
-    let confusionMatrix = getConfusionMatrix(
-      arrayOfPredictions,
-      labelsForMatrix
+    let folds = 5
+    let crossValPredictions = crossvalPredict(
+      itemsForMatrix,
+      labelsForMatrix,
+      folds
     )
 
-    printPredictions(arrayOfPredictions)
-    printAccuracyScore(accuracyScore)
-    printConfusionMatrix(confusionMatrix)
+    // fit(itemsForMatrix, labelsForMatrix)
+    // let arrayOfPredictions = predict(itemsForMatrix)
+
+    // let accuracyScore = getAccuracyScore(arrayOfPredictions, labelsForMatrix)
+    // let confusionMatrix = getConfusionMatrix(
+    //   arrayOfPredictions,
+    //   labelsForMatrix
+    // )
+
+    // console.log(crossValPredictions)
+
+    // printPredictions(arrayOfPredictions)
+    // printAccuracyScore(accuracyScore)
+    // printConfusionMatrix(confusionMatrix)
 
     let copyObjects = JSON.parse(JSON.stringify(objects))
 
@@ -170,6 +177,67 @@ module.exports = {
     // )
     return res.status(200).json('works')
   },
+}
+
+crossvalPredict = (x, y, folds) => {
+  let valuesCount = y.length
+  let valuesPerFold = valuesCount / folds
+  let randomizedY = []
+  let randomizedX = []
+  for (let attribute in x) {
+    randomizedX.push([])
+  }
+  while (y.length > 0) {
+    let item = Math.floor(Math.random() * y.length)
+    randomizedY.push(y[item])
+    for (let attribute in x) {
+      randomizedX[attribute].push(x[attribute][item])
+    }
+    y = y.filter((value, index) => {
+      return index !== item
+    })
+  }
+
+  let foldsValuesY = []
+  let foldsValuesX = []
+  while (randomizedY.length > valuesPerFold) {
+    let length = randomizedY.length
+    let foldSpliceY = randomizedY.splice(length - valuesPerFold)
+    let foldSpliceX = []
+    for (let attribute in x) {
+      foldSpliceX.push(randomizedX[attribute].splice(length - valuesPerFold))
+    }
+    foldsValuesY.push(foldSpliceY)
+    foldsValuesX.push(foldSpliceX)
+  }
+  foldsValuesY.push(randomizedY)
+  let foldAttributes = []
+  for (let attribute in x) {
+    foldAttributes.push(randomizedX[attribute])
+  }
+  foldsValuesX.push(foldAttributes)
+
+  let predictions = []
+  let trainingDataY = []
+  let trainingDataX = []
+
+  for (let setToTest = 0; setToTest < foldsValuesY.length; setToTest++) {
+    let dataToTestY = foldsValuesY[setToTest]
+    let dataToTestX = foldsValuesX[setToTest]
+    for (let setToTest2 = 0; setToTest2 < foldsValuesY.length; setToTest2++) {
+      if (setToTest !== setToTest2) {
+        trainingDataY = [...foldsValuesY[setToTest2], ...trainingDataY]
+        trainingDataX = [...foldsValuesX[setToTest2], ...trainingDataX]
+      }
+    }
+    console.log(dataToTestY)
+
+    fit(trainingDataX, trainingDataY)
+    predictions.push(predict(dataToTestX))
+    trainedAverages = []
+    trainedStds = []
+  }
+  console.log(predictions)
 }
 
 printConfusionMatrix = confusionMatrix => {
