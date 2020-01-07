@@ -295,7 +295,11 @@ const getStandardDeviation = (values, avg) => {
     return sqrDiff
   })
 
-  let stdDev = Math.sqrt(getAverage(squareDiffs))
+  let sqrDiffSum = squareDiffs.reduce((sum, num) => {
+    return sum + num
+  }, 0)
+
+  let stdDev = Math.sqrt(sqrDiffSum / (squareDiffs.length - 1))
 
   return stdDev
 }
