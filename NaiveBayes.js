@@ -13,7 +13,6 @@ let testFlower = {
 
 const crossvalPredict = (inX, inY, folds) => {
   /// RANDOMIZER START -------------------------------------------------------------
-  console.log('\n')
   console.log(`---- CrossValidation: ${folds} Folds ----`)
   let x = JSON.parse(JSON.stringify(inX))
   let y = JSON.parse(JSON.stringify(inY))
@@ -97,7 +96,6 @@ const crossvalPredict = (inX, inY, folds) => {
 
   //SET TRAINING AND TEST DATA AND DO PREDICTION PER FOLD END ---------------
 
-  console.log()
   printAccuracyScore(getAccuracyScore(predictions, yData))
   printConfusionMatrix(getConfusionMatrix(predictions, yData))
 
@@ -339,12 +337,14 @@ getData(pathToData).then(objects => {
   )
   labelsForMatrix = labelsForMatrix[0]
 
-  let folds = 5
-  let crossValPredictions = crossvalPredict(
-    itemsForMatrix,
-    labelsForMatrix,
-    folds
-  )
+  let folds = [3, 5, 10]
+  folds.forEach(fold => {
+    let crossValPredictions = crossvalPredict(
+      itemsForMatrix,
+      labelsForMatrix,
+      fold
+    )
+  })
 
   fit(itemsForMatrix, labelsForMatrix)
   let arrayOfPredictions = predict(itemsForMatrix)
