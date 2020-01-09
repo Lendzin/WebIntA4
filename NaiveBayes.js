@@ -12,6 +12,7 @@ let testFlower = {
 }
 
 const crossvalPredict = (inX, inY, folds) => {
+  /// RANDOMIZER START -------------------------------------------------------------
   console.log('\n')
   console.log(`---- CrossValidation: ${folds} Folds ----`)
   let x = JSON.parse(JSON.stringify(inX))
@@ -32,7 +33,9 @@ const crossvalPredict = (inX, inY, folds) => {
       x[attribute][randomIndex] = temporaryValue
     }
   }
+  /// RANDOMIZER END -------------------------------------------------------------
 
+  /// DIVIDE INTO FOLDS START ----------------------------------------------------
   let foldsValuesY = []
   let foldsValuesX = []
   while (y.length > valuesPerFold) {
@@ -54,6 +57,9 @@ const crossvalPredict = (inX, inY, folds) => {
 
   let predictions = []
   let yData = []
+  /// DIVIDE INTO FOLDS END ----------------------------------------------------
+
+  //SET TRAINING AND TEST DATA AND DO PREDICTION PER FOLD START ----------------
   for (let setToTest = 0; setToTest < foldsValuesY.length; setToTest++) {
     let trainingDataY = []
     let trainingDataX = []
@@ -88,6 +94,9 @@ const crossvalPredict = (inX, inY, folds) => {
     trainedAverages = []
     trainedStds = []
   }
+
+  //SET TRAINING AND TEST DATA AND DO PREDICTION PER FOLD END ---------------
+
   console.log()
   printAccuracyScore(getAccuracyScore(predictions, yData))
   printConfusionMatrix(getConfusionMatrix(predictions, yData))
@@ -96,20 +105,6 @@ const crossvalPredict = (inX, inY, folds) => {
   console.log('\n')
 
   return predictions
-}
-
-const printConfusionMatrix = confusionMatrix => {
-  confusionMatrix.forEach((classInMatrix, index) => {
-    let string = '[ '
-    for (value in classInMatrix) {
-      string +=
-        Number(value) !== classInMatrix.length - 1
-          ? classInMatrix[value] + ' ][ '
-          : '[ ' + classInMatrix[value]
-    }
-    string += ' ] --> ' + classNames[index]
-    console.log(string)
-  })
 }
 
 const getConfusionMatrix = (preds, y) => {
@@ -133,29 +128,41 @@ const getConfusionMatrix = (preds, y) => {
   return classes
 }
 
-const printAccuracyScore = accuracyScore => {
-  console.log('*Accuracy Score: ' + accuracyScore.toFixed(2) + '%')
-}
-
 const getAccuracyScore = (preds, y) => {
   let correct = 0
   let notCorrect = 0
+  // CHECK PREDICTIONS VS CORRECT PLACEMENT IN Y
   for (let x in preds) {
     preds[x] === y[x] ? correct++ : notCorrect++
   }
   return 100 - (notCorrect / preds.length) * 100
 }
 
-const printPredictions = arrayOfPredictions => {
-  let predictions = {}
-  arrayOfPredictions.forEach(prediction => {
-    if (predictions[prediction]) {
-      predictions[prediction]++
-    } else {
-      predictions[prediction] = 1
+const fit = (x, y) => {
+  let classes = new Set()
+  for (let i in y) {
+    classes.add(y[i])
+  }
+  classes = Array.from(classes).sort()
+  for (currentClass of classes) {
+    let classAverages = []
+    let classStds = []
+    for (let attribute = 0; attribute < x.length; attribute++) {
+      let currentAttributeValues = []
+      for (let value = 0; value < x[attribute].length; value++) {
+        if (y[value] === currentClass) {
+          currentAttributeValues.push(x[attribute][value])
+        }
+      }
+      let average = getAverage(currentAttributeValues)
+      classAverages.push(average)
+      let std = getStandardDeviation(currentAttributeValues, average)
+      classStds.push(std)
     }
-  })
-  console.log(predictions)
+
+    trainedAverages.push(classAverages)
+    trainedStds.push(classStds)
+  }
 }
 
 const predict = x => {
@@ -201,39 +208,11 @@ const predict = x => {
   return predictions
 }
 
-const fit = (x, y) => {
-  let classes = new Set()
-  for (let i in y) {
-    classes.add(y[i])
-  }
-  classes = Array.from(classes).sort()
-  for (currentClass of classes) {
-    let classAverages = []
-    let classStds = []
-    for (let attribute = 0; attribute < x.length; attribute++) {
-      let currentAttributeValues = []
-      for (let value = 0; value < x[attribute].length; value++) {
-        if (y[value] === currentClass) {
-          currentAttributeValues.push(x[attribute][value])
-        }
-      }
-      let average = getAverage(currentAttributeValues)
-      classAverages.push(average)
-      let std = getStandardDeviation(currentAttributeValues, average)
-      classStds.push(std)
-    }
-
-    trainedAverages.push(classAverages)
-    trainedStds.push(classStds)
-  }
-}
-
 const getPdf = (mean, std, value) => {
-  let value1 = 1 / (Math.sqrt(2 * Math.PI) * std)
-  let value2 = -Math.pow(value - mean, 2)
-  let value3 = 2 * Math.pow(std, 2)
-  let value4 = Math.exp(value2 / value3)
-  return value1 * value4
+  return (
+    (1 / (Math.sqrt(2 * Math.PI) * std)) *
+    Math.exp(-Math.pow(value - mean, 2) / (2 * Math.pow(std, 2)))
+  )
 }
 
 const getData = path => {
@@ -269,12 +248,14 @@ const getData = path => {
 const getValuesMatrix = objects => {
   let values = []
   let length = Object.keys(objects[0]).length
+  // populate array with arrays
   for (let i = 0; i < length; i++) {
     let insideArray = []
     values.push(insideArray)
   }
 
   for (let object in objects) {
+    // populate arrays within arrays with values
     let currentObject = objects[object]
     let index = 0
     for (let inside in currentObject) {
@@ -285,9 +266,6 @@ const getValuesMatrix = objects => {
   return values
 }
 
-const round = number => {
-  return Math.round(number * 100) / 100
-}
 const getStandardDeviation = (values, avg) => {
   let squareDiffs = values.map(value => {
     let diff = value - avg
@@ -299,7 +277,7 @@ const getStandardDeviation = (values, avg) => {
     return sum + num
   }, 0)
 
-  let stdDev = Math.sqrt(sqrDiffSum / (squareDiffs.length - 1))
+  let stdDev = Math.sqrt(sqrDiffSum / (squareDiffs.length - 1)) //sample standard deviation N-1
 
   return stdDev
 }
@@ -310,7 +288,38 @@ const getAverage = data => {
   }, 0)
 
   let avg = sum / data.length
-  return round(avg)
+  return avg
+}
+
+//PRINT FUNCTIONS
+const printConfusionMatrix = confusionMatrix => {
+  confusionMatrix.forEach((classInMatrix, index) => {
+    let string = '[ '
+    for (value in classInMatrix) {
+      string +=
+        Number(value) !== classInMatrix.length - 1
+          ? classInMatrix[value] + ' ][ '
+          : '[ ' + classInMatrix[value]
+    }
+    string += ' ] --> ' + classNames[index]
+    console.log(string)
+  })
+}
+
+const printAccuracyScore = accuracyScore => {
+  console.log('*Accuracy Score: ' + accuracyScore.toFixed(2) + '%')
+}
+
+const printPredictions = arrayOfPredictions => {
+  let predictions = {}
+  arrayOfPredictions.forEach(prediction => {
+    if (predictions[prediction]) {
+      predictions[prediction]++
+    } else {
+      predictions[prediction] = 1
+    }
+  })
+  console.log(predictions)
 }
 
 getData(pathToData).then(objects => {
